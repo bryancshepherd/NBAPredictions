@@ -1,10 +1,15 @@
-install.packages("rvest")
-install.packages("BradleyTerry2")
-install.packages("doBy")
+#install.packages("rvest")
+#install.packages("BradleyTerry2")
+#install.packages("doBy")
+
+# TODO: Need to add percent correct, etc. by day (not just cumulative)
+# TODO: Get historical moneyline data
+# TODO: Calculate winnings/losing using historical moneyline data
 
 library("BradleyTerry2")
 library("doBy")
 library("rvest")
+library("ggplot2")
 
 ### Define functions
 # Estimate a B-T model
@@ -21,12 +26,16 @@ estimateModel <- function(resultsData) {
   levels(resultsSummaryTable$homeTeamName)
   levels(resultsSummaryTable$awayTeamName)
   
-  bbModel <- BTm(cbind(homeTeamWon.sum, awayTeamWon.sum), homeTeamName, awayTeamName, ~ team, id = "team", data = resultsSummaryTable)
+  bbModel <- BTm(cbind(homeTeamWon.sum, awayTeamWon.sum), homeTeamName, awayTeamName, ~ team, 
+                 id = "team", data = resultsSummaryTable)
+  
+  return(list(bbModel, resultsSummaryTable))
 }
 
 # Predict future games based on an estimated B-T model
-predictBT <- function(model, upcomingGames) {
-  update(bbModel, refcat = "Golden State Warriors")
+predictBT <- function(model, upcomingGames, modelData) {
+  
+  resultsSummaryTable = modelData
   
   awayTeams = upcomingGames$awayTeamName
   
@@ -34,22 +43,31 @@ predictBT <- function(model, upcomingGames) {
 
   for (i in 1:nrow(upcomingGames)) {
     
-    print(paste0("Displaying game: ", homeTeams[i], " vs. ", awayTeams[i],
-                 "  *******************************",
-                 "*******************************"))
-    bbModel = update(bbModel, refcat = homeTeams[i])
-    modSum = summary(bbModel)
+    model = update(model, refcat = homeTeams[i])
+    modSum = summary(model)
     modSumDF = as.data.frame(modSum$coefficients)
-    prediction = modSumDF[row.names(modSumDF) %in% paste0("team", awayTeams[i]),]
-    print("")
-    print(paste0("Prediction: ", 
-                 ifelse(prediction$Estimate > 0, awayTeams[i], homeTeams[i]), " win. ", "P-value = ", round(prediction[4], 3)))
-    print("")
-    print(prediction)
-    print("")
-    print("")
-    print("")
+    modSumDFSubset = modSumDF[row.names(modSumDF) %in% paste0("team", awayTeams[i]),]
+    
+    if (exists("prediction")) {
+      tempPrediction = cbind(modSumDFSubset, upcomingGames$newDate[i])
+      tempPrediction$predWinner = ifelse(modSumDFSubset$Estimate > 0, awayTeams[i], homeTeams[i])
+      tempPrediction$predWinnerHome = ifelse(modSumDFSubset$Estimate > 0, 0, 1)
+      
+      prediction = rbind(prediction, tempPrediction)
+    } else {
+      prediction = cbind(modSumDFSubset, upcomingGames$newDate[i])
+      prediction$predWinner = ifelse(modSumDFSubset$Estimate > 0, awayTeams[i], homeTeams[i])
+      prediction$predWinnerHome = ifelse(modSumDFSubset$Estimate > 0, 0, 1)
+    }
+    
+    # print(paste0("Prediction: ", 
+    #             ifelse(prediction$Estimate > 0, awayTeams[i], homeTeams[i]), " win. ", "P-value = ", round(prediction[4], 3)))
   }
+  
+  upcomingGamesWithPredictions = cbind(upcomingGames, prediction)
+  
+  return(upcomingGamesWithPredictions)
+  
 }
 
 
@@ -86,65 +104,52 @@ gameDays <- unique(bballData$newDate)
 # Only previous game days
 previousGameDays <- gameDays[gameDays<=lastGameday]
 
+percentCorrect = vector("numeric", length(previousGameDays))
+totalIncorrect = vector("numeric", length(previousGameDays))
+totalCorrect = vector("numeric", length(previousGameDays))
+totalPlays = vector("numeric", length(previousGameDays))
+
 for (i in 1:length(previousGameDays)) {
-  if (gameDays[i+1]<=lastGameday) {
+  if (i>15 & gameDays[i+1]<=lastGameday) {
     prevResults <- bballData[bballData$newDate <= gameDays[i], ]
     
     toPredict <- bballData[bballData$newDate > gameDays[i] & bballData$newDate <= gameDays[i+1], ]
     
-    tempModel <- estimateModel(prevResults)
+    tempModelRes <- estimateModel(prevResults)
     
-    predictBT(tempModel, toPredict)
+    if (exists("allPredictions")) {
+      tempPredictions = predictBT(tempModelRes[[1]], toPredict, tempModelRes[[2]])
+      allPredictions = rbind(allPredictions, tempPredictions)
+      
+    } else {
+      allPredictions = predictBT(tempModelRes[[1]], toPredict, tempModelRes[[2]])
+    }
+    
+    strongPredictions = allPredictions[allPredictions$`Pr(>|z|)` <= .05, ]
+    
+    totalPlays[i] = nrow(strongPredictions)
+    totalCorrect[i] = sum(strongPredictions$homeTeamWon == strongPredictions$predWinnerHome)
+    totalIncorrect[i] = sum(strongPredictions$homeTeamWon != strongPredictions$predWinnerHome)
+    percentCorrect[i] = totalCorrect[i]/totalPlays[i]
+    
   }
 }
 
+# Combine data for easier ggpltting
+cumulativeResultsByDay = as.data.frame(cbind(previousGameDays, percentCorrect))
 
+ggplot(data = cumulativeResultsByDay, 
+       aes(x=previousGameDays, y = percentCorrect)) +
+       geom_line()
+       
+percentCorrect
 
+plot(previousGameDays, totalPlays)
+plot(previousGameDays, totalIncorrect)
+plot(previousGameDays, totalCorrect)
+plot(previousGameDays, percentCorrect)
 
+lm(totalCorrect ~ 0 + previousGameDays)
+lm(totalIncorrect ~ 0 + previousGameDays)
 
-
-
-
-
-
-
-
-
-
-
-
-attributes(modSum)
-
-bbModel$model
-
-as.data.frame(bbModel)
-# 
-# data("citations", package = "BradleyTerry2")
-# citations
-# citations.sf <- countsToBinomial(citations)
-# 
-# citeModel <- BTm(cbind(win1, win2), player1, player2, ~ journal, id = "journal", data = citations.sf)
-# citeModel
-# 
-# head(cbind(bballData$homeTeam, as.factor(bballData$homeTeam)))
-# 
-
-
-memory.profile()
-memory.size()
-
-
-?BTm
-
-correct = 0
-for (i in 1:10000) {
-  choice = sample(1:2, 1)
-  flip = sample(1:2, 1)
-  
-  if (choice == flip) {
-    correct = correct + 1
-  } 
-    
-}
-
-correct
+cbind(totalCorrect, totalIncorrect, totalPlays, percentCorrect)
