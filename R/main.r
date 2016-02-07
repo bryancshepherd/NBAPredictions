@@ -70,7 +70,21 @@ predictBT <- function(model, upcomingGames, modelData) {
   
 }
 
-
+# Function to calculate summary statistics
+createSummaryStats <- function (predictions, pvalue = .05) {
+  
+  tempStats = {}
+  
+  strongPredictions <-  predictions[predictions$`Pr(>|z|)` <= pvalue, ]
+  
+  tempStats[["totalPlays"]] = nrow(strongPredictions)
+  tempStats[["totalCorrect"]] = sum(strongPredictions$homeTeamWon == strongPredictions$predWinnerHome)
+  tempStats[["totalIncorrect"]] = sum(strongPredictions$homeTeamWon != strongPredictions$predWinnerHome)
+  tempStats[["percentCorrect"]] = ifelse(tempStats[["totalPlays"]] > 0, tempStats[["totalCorrect"]]/tempStats[["totalPlays"]], 0)
+  
+  return(tempStats)
+  
+}
 
 
 ## Eventually automate the data pull, but the site layout is not conducive to webscraping
@@ -79,7 +93,7 @@ predictBT <- function(model, upcomingGames, modelData) {
 # scheduleAndResultsHTML = read_html("http://www.basketball-reference.com/leagues/NBA_2016_games.html?lid=standings_sked") 
 # scheduleAndResults = scheduleAndResultsHTML %>% html_nodes("tr")
 
-bballData <- read.csv("../Data/scheduleAndResults01312016.csv", stringsAsFactors = FALSE, header = TRUE)
+bballData <- read.csv("../Data/scheduleAndResults02062016.csv", stringsAsFactors = FALSE, header = TRUE)
 
 ## Clean up data
 # Better colnames 
@@ -104,10 +118,11 @@ gameDays <- unique(bballData$newDate)
 # Only previous game days
 previousGameDays <- gameDays[gameDays<=lastGameday]
 
-percentCorrect = vector("numeric", length(previousGameDays))
-totalIncorrect = vector("numeric", length(previousGameDays))
-totalCorrect = vector("numeric", length(previousGameDays))
-totalPlays = vector("numeric", length(previousGameDays))
+percentDailyCorrect = percentCorrect = vector("numeric", length(previousGameDays))
+totalDailyIncorrect = totalIncorrect = vector("numeric", length(previousGameDays))
+totalDailyCorrect = totalCorrect = vector("numeric", length(previousGameDays))
+totalDailyPlays = totalPlays = vector("numeric", length(previousGameDays))
+
 
 for (i in 1:length(previousGameDays)) {
   if (i>15 & gameDays[i+1]<=lastGameday) {
@@ -119,30 +134,40 @@ for (i in 1:length(previousGameDays)) {
     
     if (exists("allPredictions")) {
       tempPredictions = predictBT(tempModelRes[[1]], toPredict, tempModelRes[[2]])
+      
+      summaryStats = createSummaryStats(tempPredictions)
+      totalDailyPlays[i] = summaryStats[["totalPlays"]]
+      totalDailyCorrect[i] = summaryStats[["totalCorrect"]]
+      totalDailyIncorrect[i] = summaryStats[["totalIncorrect"]]
+      percentDailyCorrect[i] = summaryStats[["percentCorrect"]]
+      
       allPredictions = rbind(allPredictions, tempPredictions)
       
     } else {
       allPredictions = predictBT(tempModelRes[[1]], toPredict, tempModelRes[[2]])
+      
+      summaryStats = createSummaryStats(allPredictions)
+      totalDailyPlays[i] = summaryStats[["totalPlays"]]
+      totalDailyCorrect[i] = summaryStats[["totalCorrect"]]
+      totalDailyIncorrect[i] = summaryStats[["totalIncorrect"]]
+      percentDailyCorrect[i] = summaryStats[["percentCorrect"]]
     }
     
-    strongPredictions = allPredictions[allPredictions$`Pr(>|z|)` <= .05, ]
-    
-    totalPlays[i] = nrow(strongPredictions)
-    totalCorrect[i] = sum(strongPredictions$homeTeamWon == strongPredictions$predWinnerHome)
-    totalIncorrect[i] = sum(strongPredictions$homeTeamWon != strongPredictions$predWinnerHome)
-    percentCorrect[i] = totalCorrect[i]/totalPlays[i]
+    summaryStats = createSummaryStats(allPredictions)
+    totalPlays[i] = summaryStats[["totalPlays"]]
+    totalCorrect[i] = summaryStats[["totalCorrect"]]
+    totalIncorrect[i] = summaryStats[["totalIncorrect"]]
+    percentCorrect[i] = summaryStats[["percentCorrect"]]
     
   }
 }
 
-# Combine data for easier ggpltting
+# Combine data for easier ggplotting
 cumulativeResultsByDay = as.data.frame(cbind(previousGameDays, percentCorrect))
 
 ggplot(data = cumulativeResultsByDay, 
        aes(x=previousGameDays, y = percentCorrect)) +
        geom_line()
-       
-percentCorrect
 
 plot(previousGameDays, totalPlays)
 plot(previousGameDays, totalIncorrect)
@@ -153,3 +178,20 @@ lm(totalCorrect ~ 0 + previousGameDays)
 lm(totalIncorrect ~ 0 + previousGameDays)
 
 cbind(totalCorrect, totalIncorrect, totalPlays, percentCorrect)
+
+# Combine data for easier ggplotting
+cumulativeDailySummaryResultsByDay = as.data.frame(cbind(previousGameDays, percentDailyCorrect))
+
+ggplot(data = cumulativeDailySummaryResultsByDay, 
+       aes(x=previousGameDays, y = percentDailyCorrect)) +
+  geom_line()
+
+plot(previousGameDays, totalDailyPlays)
+plot(previousGameDays, totalDailyIncorrect)
+plot(previousGameDays, totalDailyCorrect)
+plot(previousGameDays, percentDailyCorrect)
+
+summary(lm(totalDailyCorrect ~ 0 + previousGameDays))
+summary(lm(totalDailyIncorrect ~ 0 + previousGameDays))
+summary(lm(totalDailyPlays ~ 0 + previousGameDays))
+summary(lm(percentDailyCorrect ~ 0 + previousGameDays))
