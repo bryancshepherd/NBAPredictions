@@ -2,7 +2,7 @@
 #install.packages("BradleyTerry2")
 #install.packages("doBy")
 
-# TODO: Need to add percent correct, etc. by day (not just cumulative)
+# TODO: Set up to facilitate predicting for new data
 # TODO: Get historical moneyline data
 # TODO: Calculate winnings/losing using historical moneyline data
 
@@ -86,6 +86,27 @@ createSummaryStats <- function (predictions, pvalue = .05) {
   
 }
 
+# Function to calculate returns
+calculateReturns <- function (predictions, pvalue = .05, startingBalance = 1000, betSize = 100) {
+  
+  tempStats = {}
+  
+  strongPredictions <-  predictions[predictions$`Pr(>|z|)` <= pvalue, ]
+  
+  strongPredictions$gameReturn <- ifelse(strongPredictions$predWinnerHome, 
+                                         ifelse(strongPredictions$homeTeamWon, 
+                                                ifelse(strongPredictions$homeOdds > 0, strongPredictions$homeOdds, betSize),
+                                                ifelse(strongPredictions$homeOdds > 0, betSize, strongPredictions$homeOdds)),
+                                         ifelse(strongPredictions$awayTeamWon, 
+                                                ifelse(strongPredictions$awayOdds > 0, strongPredictions$awayOdds, betSize),
+                                                ifelse(strongPredictions$awayOdds > 0, betSize, strongPredictions$awayOdds)))
+  
+  strongPredictions$cumReturns <- cumsum(strongPredictions$gameReturn)
+  
+  return(strongPredictions)
+  
+}
+
 
 ## Eventually automate the data pull, but the site layout is not conducive to webscraping
 ## Since a .csv file is easy to get, let's see if there are worthwhile 
@@ -107,6 +128,14 @@ bballData$newDate <- as.Date(substr(bballData$date, 5, 15), format="%b %d %Y")
 bballData$homeTeamWon <- ifelse(bballData$homeTeamPoints > bballData$awayTeamPoints, 1, 0)
 bballData$awayTeamWon <- ifelse(bballData$homeTeamPoints < bballData$awayTeamPoints, 1, 0)
 
+## Bring in odds data
+oddsData <- read.csv("../Data/HistoricalOdds_cleaned.csv", stringsAsFactors = FALSE, header = TRUE)
+oddsData$newDate <- as.Date(oddsData$Date, format="%m/%d/%Y")
+
+tempMerged <- merge(bballData, oddsData, by = c("newDate", "awayTeamName", "homeTeamName"), all.x = TRUE)
+
+bballData <- tempMerged
+
 ## Split data for estimation and prediction
 # Get number of previous games so that we know when to stop 
 numberOfPreviousGames <- sum(!is.na(bballData$homeTeamPoints))
@@ -125,10 +154,10 @@ totalDailyPlays = totalPlays = vector("numeric", length(previousGameDays))
 
 
 for (i in 1:length(previousGameDays)) {
-  if (i>15 & gameDays[i+1]<=lastGameday) {
-    prevResults <- bballData[bballData$newDate <= gameDays[i], ]
+  if (i>15 & gameDays[i]<=lastGameday) {
+    prevResults <- bballData[bballData$newDate < gameDays[i], ]
     
-    toPredict <- bballData[bballData$newDate > gameDays[i] & bballData$newDate <= gameDays[i+1], ]
+    toPredict <- bballData[bballData$newDate == gameDays[i], ]
     
     tempModelRes <- estimateModel(prevResults)
     
@@ -162,12 +191,38 @@ for (i in 1:length(previousGameDays)) {
   }
 }
 
+returns <- calculateReturns(allPredictions)
+
+# Check calculations
+head(returns[returns$predWinnerHome == 1 & returns$homeTeamWon == 1 & returns$homeOdds > 0, ], 5)
+head(returns[returns$predWinnerHome == 1 & returns$homeTeamWon == 1 & returns$homeOdds < 0, ], 5)
+head(returns[returns$predWinnerHome == 1 & returns$homeTeamWon == 0 & returns$homeOdds > 0, ], 5)
+head(returns[returns$predWinnerHome == 1 & returns$homeTeamWon == 0 & returns$homeOdds < 0, ], 5)
+
+head(returns[returns$predWinnerHome == 0 & returns$homeTeamWon == 0 & returns$homeOdds > 0, ], 5)
+head(returns[returns$predWinnerHome == 0 & returns$homeTeamWon == 0 & returns$homeOdds < 0, ], 5)
+head(returns[returns$predWinnerHome == 0 & returns$homeTeamWon == 1 & returns$homeOdds > 0, ], 5)
+head(returns[returns$predWinnerHome == 0 & returns$homeTeamWon == 1 & returns$homeOdds < 0, ], 5)
+
+head(returns[returns$predWinnerHome == 1 & returns$awayOdds > 0, ], 5)
+head(returns[returns$predWinnerHome == 0 & returns$homeOdds > 0, ], 5)
+
+# What is the distribution of variables for strong predictions
+summary(returns[returns$predWinnerHome == 1, ])
+summary(returns[returns$predWinnerHome == 0, ])
+
+# What if we only bet on underdogs that are predicted to win?
+# Given that there aren't any home teams that are underdogs and predicted to win, it
+# seems like the odds makers are giving assuming a home team advantage when creating odds
+returns[returns$predWinnerHome == 1 & returns$homeOdds > 0, ]
+returns[returns$predWinnerHome == 0 & returns$awayOdds > 0, ]
+
 # Combine data for easier ggplotting
 cumulativeResultsByDay = as.data.frame(cbind(previousGameDays, percentCorrect))
 
 ggplot(data = cumulativeResultsByDay, 
        aes(x=previousGameDays, y = percentCorrect)) +
-       geom_line()
+  geom_line()
 
 plot(previousGameDays, totalPlays)
 plot(previousGameDays, totalIncorrect)
