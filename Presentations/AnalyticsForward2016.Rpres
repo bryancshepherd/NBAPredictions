@@ -1,0 +1,37 @@
+AnalyticsForward2016
+========================================================
+author: Bryan Shepherd
+date: 2/14/16
+autosize: true
+
+First Slide
+========================================================
+
+For more details on authoring R presentations please visit <https://support.rstudio.com/hc/en-us/articles/200486468>.
+
+- Bullet 1
+- Bullet 2
+- Bullet 3
+
+Slide With Code
+========================================================
+
+```{r}
+summary(cars)
+```
+
+Slide With Plot
+========================================================
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Slide With Plot
+========================================================
+
+```{r, echo=FALSE, results='asis', message=FALSE}
+library(googleVis)
+M1 = gvisMotionChart(Fruits, idvar = 'Fruit', timevar = "Year")
+print(M1)
+```
