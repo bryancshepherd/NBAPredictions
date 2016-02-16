@@ -2,29 +2,15 @@ from bs4 import BeautifulSoup
 import requests
 
 r = requests.get("http://www.basketball-reference.com/leagues/NBA_2016_games.html?lid=standings_sked")
+
+# Check results
 r.status_code
-
 r.headers['content-type']
-
 r.encoding
-
-r.text
 
 soup = BeautifulSoup(r.text, "lxml")
 
-# print(soup.prettify())
-
-
-total_iters = 0
-for row in soup.find_all('tr'):
-    num_of_tds = 0
-    for td in row.find_all('td'):
-        print(td)
-        
-        total_iters = total_iters+1
-        num_of_tds = num_of_tds + 1
-
-
+# Create lists from table columns that will eventually be combined into a data set
 game_date = []
 game_time = []
 entry_type = []
