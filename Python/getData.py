@@ -35,5 +35,22 @@ for row in soup.find_all('tr'):
         notes.append(row_data[8].string)
 
 
+#### Get odds data
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'
+}
 
+## Will need to use the schedule to iterate through this by day
+url = "http://www.scoresandodds.com/grid_20151027.html"
 
+r = requests.get(url, headers=headers)
+
+# Check results
+r.status_code
+r.headers['content-type']
+r.encoding
+
+soup = BeautifulSoup(r.text, "lxml")
+
+# Still need to pull numbers from the table the code below creates
+nba_div = soup.find("div", id = "nba").next_sibling.table
