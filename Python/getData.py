@@ -4,9 +4,11 @@ import requests
 r = requests.get("http://www.basketball-reference.com/leagues/NBA_2016_games.html?lid=standings_sked")
 
 # Check results
+```{python}
 r.status_code
 r.headers['content-type']
 r.encoding
+```
 
 soup = BeautifulSoup(r.text, "lxml")
 
@@ -54,3 +56,30 @@ soup = BeautifulSoup(r.text, "lxml")
 
 # Still need to pull numbers from the table the code below creates
 nba_div = soup.find("div", id = "nba").next_sibling.table
+
+# Get team name and moneyline data from table columns
+# Away team
+away_team_list = nba_div.find_all("tr", "team odd")
+away_team_name_odds = []
+away_team_moneyline_odds = []
+
+for team in away_team_list:
+    column_data = team.find_all("td")
+    away_team_name_odds.append(column_data[0].string)
+    away_team_moneyline_odds.append(column_data[4].string)
+
+
+# Get team name and moneyline data from table columns
+# Home team
+home_team_list = nba_div.find_all("tr", "team odd")
+home_team_name_odds = []
+home_team_moneyline_odds = []
+
+for team in home_team_list:
+    column_data = team.find_all("td")
+    home_team_name_odds.append(column_data[0].string)
+    home_team_moneyline_odds.append(column_data[4].string)
+
+
+print(nba_div.prettify())
+
