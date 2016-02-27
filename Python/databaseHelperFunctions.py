@@ -5,7 +5,6 @@ import random
 import sys
 import os.path
 
-db_loc = 'C:/GitHub/NBAPredictions/Data/NBAData.db'
 
 def allTablesAreEmpty(sqldb_file, close_when_done = True):
     
@@ -14,7 +13,7 @@ def allTablesAreEmpty(sqldb_file, close_when_done = True):
     c = conn.cursor()
     
     # Get the list of tables
-    c.execute('''SELECT name FROM sqlite_master WHERE type = "table"''')
+    c.execute('SELECT name FROM sqlite_master WHERE type = "table"')
 
     all_tables = c.fetchall()
     
@@ -38,7 +37,7 @@ def dbHasNoTables(sqldb_file, close_when_done = True):
     c = conn.cursor()
     
     # Get the list of tables
-    c.execute('''SELECT name FROM sqlite_master WHERE type = "table"''')
+    c.execute('SELECT name FROM sqlite_master WHERE type = "table"')
 
     all_tables = c.fetchall()
 
@@ -54,9 +53,8 @@ def addTables(db_file):
     c = conn.cursor()
                 
     # Now add tables to database
-    c.execute('''CREATE TABLE schedule (game_id text, home_team text, away_team text, game_date text, game_time text)''')
-    c.execute('''CREATE TABLE results (game_id text, entry_type text, home_score int, away_score int, overtime_indicator int, notes text)''')
-    c.execute('''CREATE TABLE odds (game_id text, home_team text, away_team text, home_team_odds real, away_team_odds real)''')
+    c.execute('CREATE TABLE schedule (game_date text, game_time text, entry_type text, away_team text, away_score int, home_team text, home_score int, overtime_indicator int, notes text)')
+    c.execute('CREATE TABLE odds (game_date text, home_team text, away_team text, home_team_odds real, away_team_odds real)')
                 
     conn.commit()
     conn.close()
@@ -87,4 +85,6 @@ def dbSetup(file_loc):
         # If the file doesn't exist, make the connection and implicitly create the database and add tables
         addTables(file_loc)
 
-dbSetup(db_loc)
+
+
+
