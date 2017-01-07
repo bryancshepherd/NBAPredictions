@@ -1,3 +1,4 @@
 .Rhistory
 */.Rhistory
 /Python/__pycache__/
+*.pyc
