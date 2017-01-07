@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import datetime
-os.chdir('C:/GitHub/NBAPredictions/Python/')
+os.chdir('C:/Users/bryan/Documents/Projects/NBAPredictions/Python/')
 
 os.getcwd()
 
@@ -9,18 +9,18 @@ from bs4 import BeautifulSoup
 import databaseHelperFunctions as dbh
 import requests
 
-db_loc = 'C:/GitHub/NBAPredictions/Data/NBAData.db'
+db_loc = 'C:/Users/bryan/Documents/Projects/NBAPredictions/Data/NBAData.db'
 
 dbh.dbSetup(db_loc)
 
-r = requests.get("http://www.basketball-reference.com/leagues/NBA_2016_games.html?lid=standings_sked")
+r = requests.get("http://www.basketball-reference.com/leagues/NBA_2016_games-october.html")
 
-# Check results
-```{python}
-r.status_code
-r.headers['content-type']
-r.encoding
-```
+## Check results
+#```{python}
+#r.status_code
+#r.headers['content-type']
+#r.encoding
+#```
 
 soup = BeautifulSoup(r.text, "lxml")
 
@@ -29,9 +29,11 @@ results_values = []
 for row in soup.find_all('tr'):
     row_data = row.find_all('td')
     if (len(row_data) > 0):
-        results_values.append((row_data[0].string, row_data[1].string, row_data[2].string, row_data[3].string, \
-                               row_data[4].string, row_data[5].string, row_data[6].string, row_data[7].string, \
-                               row_data[8].string))
+        game_date = row.find_all('th')[0].string
+        results_values.append((game_date, row_data[0].string, row_data[1].string, \
+                               row_data[2].string, row_data[3].string, \
+                               row_data[4].string, row_data[5].string, \
+                               row_data[6].string, row_data[7].string))
 
 # Make the connection
 conn = sqlite3.connect('../Data/NBAData.db')
@@ -59,6 +61,8 @@ headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'
 }
 
+
+#### Not sure what's going on with these functions...
 #### Get list of days to iterate through
 def getMostRecentOddsDate(db_loc):
     conn = sqlite3.connect(db_loc)

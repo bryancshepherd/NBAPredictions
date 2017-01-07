@@ -53,7 +53,7 @@ def addTables(db_file):
     c = conn.cursor()
                 
     # Now add tables to database
-    c.execute('CREATE TABLE schedule (game_date text, game_time text, entry_type text, away_team text, away_score int, home_team text, home_score int, overtime_indicator int, notes text)')
+    c.execute('CREATE TABLE schedule (game_date text, game_time text, away_team text, away_score int, home_team text, home_score int, overtime_indicator int, notes text)')
     c.execute('CREATE TABLE odds (game_date text, away_team text, home_team text, away_team_odds real, home_team_odds real)')
                 
     conn.commit()
